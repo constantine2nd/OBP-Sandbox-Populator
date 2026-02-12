@@ -186,6 +186,15 @@ export interface CreateTransactionRequestPayload {
 	description: string;
 }
 
+export interface CreateTransactionRequestCounterpartyPayload {
+	to: {
+		counterparty_id: string;
+	};
+	value: TransactionValue;
+	description: string;
+	charge_policy?: string;
+}
+
 // User Types
 export interface User {
 	user_id: string;

@@ -15,6 +15,7 @@ import type {
 	CreateHistoricalTransactionPayload,
 	TransactionRequest,
 	CreateTransactionRequestPayload,
+	CreateTransactionRequestCounterpartyPayload,
 	User
 } from './types';
 
@@ -306,6 +307,25 @@ export class OBPClient {
 		const response = await fetch(
 			this.url(
 				`/banks/${fromBankId}/accounts/${fromAccountId}/${viewId}/transaction-request-types/ACCOUNT/transaction-requests`
+			),
+			{
+				method: 'POST',
+				headers: this.getHeaders(),
+				body: JSON.stringify(payload)
+			}
+		);
+		return this.handleResponse<TransactionRequest>(response);
+	}
+
+	async createTransactionRequestCounterparty(
+		fromBankId: string,
+		fromAccountId: string,
+		payload: CreateTransactionRequestCounterpartyPayload,
+		viewId: string = 'owner'
+	): Promise<TransactionRequest> {
+		const response = await fetch(
+			this.url(
+				`/banks/${fromBankId}/accounts/${fromAccountId}/${viewId}/transaction-request-types/COUNTERPARTY/transaction-requests`
 			),
 			{
 				method: 'POST',

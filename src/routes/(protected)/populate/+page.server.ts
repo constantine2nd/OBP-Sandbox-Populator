@@ -57,17 +57,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 					full_name: bank.full_name
 				});
 
-				// Get accounts for this bank
+				// Get accounts for this bank (v6.0.0 returns account_id)
 				try {
 					const accountsResponse = await client.getAccountsAtBank(bank.bank_id);
 					const accounts = accountsResponse.accounts || [];
 					for (const account of accounts) {
-						const accountId = (account as any).account_id || (account as any).id || '';
 						existing.accounts.push({
-							account_id: accountId,
+							account_id: account.account_id,
 							bank_id: bank.bank_id,
-							label: (account as any).label || '',
-							currency: (account as any).currency || ''
+							label: account.label || '',
+							currency: account.currency || ''
 						});
 					}
 				} catch (e) {
@@ -246,17 +245,11 @@ export const actions: Actions = {
 			// Create Accounts for each bank
 			logger.info(`Creating ${numAccountsPerBank} accounts per bank...`);
 			for (const bank of results.banks) {
-				// Get existing accounts for this bank
-				// Note: API returns 'id' not 'account_id' for the list endpoint
-				let existingAccounts: Array<{ id?: string; account_id?: string; label?: string; currency?: string }> = [];
+				// Get existing accounts for this bank (v6.0.0 returns account_id)
+				let existingAccounts: Array<{ account_id: string; label?: string; currency?: string }> = [];
 				try {
 					const accountsResponse = await client.getAccountsAtBank(bank.bank_id);
-					// Handle both array and object with accounts property
-					if (Array.isArray(accountsResponse)) {
-						existingAccounts = accountsResponse;
-					} else if (accountsResponse && accountsResponse.accounts) {
-						existingAccounts = accountsResponse.accounts;
-					}
+					existingAccounts = accountsResponse.accounts || [];
 					logger.debug(`Found ${existingAccounts.length} existing accounts at ${bank.bank_id}`);
 				} catch (e: any) {
 					logger.warn(`Could not fetch existing accounts for ${bank.bank_id}: ${e.message}`);
@@ -266,12 +259,11 @@ export const actions: Actions = {
 					const label = `Account ${j}`;
 					try {
 						// Check if account with this label already exists
-						const existingAccount = existingAccounts.find(a => a.label && a.label === label);
+						const existingAccount = existingAccounts.find(a => a.label === label);
 						if (existingAccount) {
-							const accountId = existingAccount.account_id || existingAccount.id || '';
 							logger.info(`Account "${label}" already exists at ${bank.bank_id}, skipping`);
 							results.accounts.push({
-								account_id: accountId,
+								account_id: existingAccount.account_id,
 								bank_id: bank.bank_id,
 								label: existingAccount.label || label,
 								currency: existingAccount.currency || currency,
@@ -526,6 +518,191 @@ export const actions: Actions = {
 				error: e.message || 'Population failed',
 				results
 			});
+		}
+	},
+
+	createCounterpartyTransactionRequests: async ({ locals }) => {
+		const session = locals.session;
+		const accessToken = session?.data?.oauth?.access_token;
+		const user = session?.data?.user;
+
+		if (!accessToken || !user) {
+			return fail(401, { error: 'Not authenticated' });
+		}
+
+		const client = new OBPClient(env.PUBLIC_OBP_BASE_URL, 'v6.0.0', accessToken);
+		const bankIdPrefix = getUsernamePrefix(user.username);
+
+		const results: {
+			transactionRequests: Array<{ id: string; type: string; status: string; amount: string; counterparty: string }>;
+			errors: string[];
+		} = {
+			transactionRequests: [],
+			errors: []
+		};
+
+		try {
+			// Find user's banks
+			const banksResponse = await client.getBanks();
+			const userBanks = banksResponse.banks.filter(b => b.bank_id.startsWith(bankIdPrefix + '.'));
+
+			if (userBanks.length === 0) {
+				return fail(400, { error: 'No banks found. Please populate first.', results });
+			}
+
+			const bank = userBanks[0];
+
+			// Get accounts for this bank (v6.0.0 returns account_id)
+			const accountsResponse = await client.getAccountsAtBank(bank.bank_id);
+			const accounts = accountsResponse.accounts || [];
+
+			if (accounts.length === 0) {
+				return fail(400, { error: `No accounts found for bank ${bank.bank_id}. Please populate first.`, results });
+			}
+
+			const account = accounts[0];
+
+			// Get counterparties for this account
+			const cpResponse = await client.getCounterparties(bank.bank_id, account.account_id);
+			const counterparties = cpResponse.counterparties || [];
+
+			if (counterparties.length === 0) {
+				return fail(400, { error: 'No counterparties found. Please populate with counterparties first.', results });
+			}
+
+			// Create 10 transaction requests to various counterparties
+			const descriptions = [
+				'Office supplies', 'Consulting services', 'Monthly subscription',
+				'Equipment rental', 'Catering services', 'Marketing materials',
+				'Training workshop', 'Software license', 'Maintenance fee', 'Delivery charges'
+			];
+
+			for (let i = 0; i < 10; i++) {
+				const counterparty = counterparties[i % counterparties.length];
+				const amount = (Math.random() * 50 + 5).toFixed(2); // Low value: 5-55
+				const description = descriptions[i];
+
+				try {
+					const txnRequest = await client.createTransactionRequestCounterparty(
+						bank.bank_id,
+						account.account_id,
+						{
+							to: { counterparty_id: counterparty.counterparty_id },
+							value: { currency: 'BWP', amount },
+							description,
+							charge_policy: 'SHARED'
+						}
+					);
+
+					results.transactionRequests.push({
+						id: txnRequest.id,
+						type: 'COUNTERPARTY',
+						status: txnRequest.status,
+						amount: `${amount} BWP`,
+						counterparty: counterparty.name
+					});
+					logger.info(`Created COUNTERPARTY transaction request: ${txnRequest.id}`);
+				} catch (e: any) {
+					const errorMsg = `Failed to create transaction request to ${counterparty.name}: ${e.message}`;
+					logger.error(errorMsg);
+					results.errors.push(errorMsg);
+				}
+
+				await delay(100);
+			}
+
+			return { success: true, action: 'counterpartyTransactionRequests', results };
+		} catch (e: any) {
+			logger.error('Failed to create counterparty transaction requests:', e);
+			return fail(500, { error: e.message, results });
+		}
+	},
+
+	createAccountTransactionRequests: async ({ locals }) => {
+		const session = locals.session;
+		const accessToken = session?.data?.oauth?.access_token;
+		const user = session?.data?.user;
+
+		if (!accessToken || !user) {
+			return fail(401, { error: 'Not authenticated' });
+		}
+
+		const client = new OBPClient(env.PUBLIC_OBP_BASE_URL, 'v6.0.0', accessToken);
+		const bankIdPrefix = getUsernamePrefix(user.username);
+
+		const results: {
+			transactionRequests: Array<{ id: string; type: string; status: string; amount: string; toAccount: string }>;
+			errors: string[];
+		} = {
+			transactionRequests: [],
+			errors: []
+		};
+
+		try {
+			// Find user's banks
+			const banksResponse = await client.getBanks();
+			const userBanks = banksResponse.banks.filter(b => b.bank_id.startsWith(bankIdPrefix + '.'));
+
+			if (userBanks.length === 0) {
+				return fail(400, { error: 'No banks found. Please populate first.', results });
+			}
+
+			const bank = userBanks[0];
+
+			// Get accounts for this bank (v6.0.0 returns account_id)
+			const accountsResponse = await client.getAccountsAtBank(bank.bank_id);
+			const accounts = accountsResponse.accounts || [];
+
+			if (accounts.length < 2) {
+				return fail(400, { error: 'Need at least 2 accounts. Please populate first.', results });
+			}
+
+			const fromAccount = accounts[0];
+
+			// Create 10 transaction requests to various accounts
+			const descriptions = [
+				'Internal transfer', 'Savings deposit', 'Budget allocation',
+				'Expense reimbursement', 'Petty cash', 'Reserve fund',
+				'Operating expenses', 'Payroll funding', 'Investment transfer', 'Emergency fund'
+			];
+
+			for (let i = 0; i < 10; i++) {
+				const toAccount = accounts[(i % (accounts.length - 1)) + 1]; // Skip first account
+				const amount = (Math.random() * 50 + 5).toFixed(2); // Low value: 5-55
+				const description = descriptions[i];
+
+				try {
+					const txnRequest = await client.createTransactionRequest(
+						bank.bank_id,
+						fromAccount.account_id,
+						{
+							to: { bank_id: bank.bank_id, account_id: toAccount.account_id },
+							value: { currency: 'BWP', amount },
+							description
+						}
+					);
+
+					results.transactionRequests.push({
+						id: txnRequest.id,
+						type: 'ACCOUNT',
+						status: txnRequest.status,
+						amount: `${amount} BWP`,
+						toAccount: toAccount.label || toAccount.account_id
+					});
+					logger.info(`Created ACCOUNT transaction request: ${txnRequest.id}`);
+				} catch (e: any) {
+					const errorMsg = `Failed to create transaction request to ${toAccount.account_id}: ${e.message}`;
+					logger.error(errorMsg);
+					results.errors.push(errorMsg);
+				}
+
+				await delay(100);
+			}
+
+			return { success: true, action: 'accountTransactionRequests', results };
+		} catch (e: any) {
+			logger.error('Failed to create account transaction requests:', e);
+			return fail(500, { error: e.message, results });
 		}
 	}
 };

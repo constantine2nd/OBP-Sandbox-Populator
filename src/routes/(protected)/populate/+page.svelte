@@ -15,12 +15,16 @@
 		Check,
 		ExternalLink,
 		Plus,
-		RotateCcw
+		RotateCcw,
+		Send,
+		ArrowRightLeft
 	} from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let isLoading = $state(false);
+	let isLoadingCounterpartyTxn = $state(false);
+	let isLoadingAccountTxn = $state(false);
 	let numBanks = $state(data.defaults.numBanks);
 	let numAccountsPerBank = $state(data.defaults.numAccountsPerBank);
 	let currency = $state(data.defaults.currency);
@@ -266,7 +270,7 @@
 				<button
 					type="submit"
 					class="btn preset-filled-primary-500 w-full mt-6"
-					disabled={isLoading}
+					disabled={isLoading || isLoadingCounterpartyTxn || isLoadingAccountTxn}
 				>
 					{#if isLoading}
 						<Loader2 class="size-5 animate-spin mr-2" />
@@ -277,6 +281,61 @@
 					{/if}
 				</button>
 			</form>
+
+			<hr class="border-surface-700 my-4" />
+
+			<p class="text-sm font-medium mb-3">Transaction Requests</p>
+			<div class="grid grid-cols-2 gap-3">
+				<form
+					method="POST"
+					action="?/createCounterpartyTransactionRequests"
+					use:enhance={() => {
+						isLoadingCounterpartyTxn = true;
+						return async ({ update }) => {
+							await update();
+							isLoadingCounterpartyTxn = false;
+						};
+					}}
+				>
+					<button
+						type="submit"
+						class="btn preset-tonal-secondary w-full text-sm"
+						disabled={isLoading || isLoadingCounterpartyTxn || isLoadingAccountTxn}
+					>
+						{#if isLoadingCounterpartyTxn}
+							<Loader2 class="size-4 animate-spin mr-1" />
+						{:else}
+							<Users class="size-4 mr-1" />
+						{/if}
+						10 to Counterparties
+					</button>
+				</form>
+
+				<form
+					method="POST"
+					action="?/createAccountTransactionRequests"
+					use:enhance={() => {
+						isLoadingAccountTxn = true;
+						return async ({ update }) => {
+							await update();
+							isLoadingAccountTxn = false;
+						};
+					}}
+				>
+					<button
+						type="submit"
+						class="btn preset-tonal-secondary w-full text-sm"
+						disabled={isLoading || isLoadingCounterpartyTxn || isLoadingAccountTxn}
+					>
+						{#if isLoadingAccountTxn}
+							<Loader2 class="size-4 animate-spin mr-1" />
+						{:else}
+							<ArrowRightLeft class="size-4 mr-1" />
+						{/if}
+						10 to Accounts
+					</button>
+				</form>
+			</div>
 		</div>
 
 		<!-- Results Panel -->
@@ -329,6 +388,59 @@
 						{/if}
 					</ul>
 					<p class="text-xs text-surface-500 mt-6">This may take a moment depending on the number of items...</p>
+				</div>
+			{:else if isLoadingCounterpartyTxn || isLoadingAccountTxn}
+				<div class="py-6 text-surface-400">
+					<p class="text-sm mb-4">Creating transaction requests...</p>
+					<ul class="space-y-3">
+						<li class="flex items-center gap-3">
+							<Loader2 class="size-4 animate-spin text-primary-400" />
+							<span>Creating 10 transaction requests...</span>
+						</li>
+					</ul>
+				</div>
+			{:else if form?.success && form?.action && form.results?.transactionRequests}
+				<div class="space-y-4 max-h-[60vh] overflow-y-auto">
+					<p class="text-sm text-surface-400 mb-2">
+						Created {form.results.transactionRequests.length} {form.action === 'counterpartyTransactionRequests' ? 'COUNTERPARTY' : 'ACCOUNT'} transaction requests
+					</p>
+
+					<div class="p-3 rounded-lg bg-surface-800/50">
+						<div class="flex items-center gap-2 mb-2">
+							<Send class="size-4 text-secondary-500" />
+							<span class="font-medium">Transaction Requests: {form.results.transactionRequests.length}</span>
+						</div>
+						{#if form.results.transactionRequests.length > 0}
+							<ul class="text-sm text-surface-400 ml-6 space-y-1 max-h-48 overflow-y-auto">
+								{#each form.results.transactionRequests as txnReq}
+									<li class="flex items-center gap-1">
+										<span title="Newly created"><Plus class="size-3 text-success-400" /></span>
+										<code class="text-xs bg-surface-700 px-1 rounded">{txnReq.id}</code>
+										<span class="text-surface-500 mx-1">|</span>
+										<span class="text-tertiary-400">{txnReq.amount}</span>
+										<span class="text-surface-500 mx-1">→</span>
+										<span class="text-surface-300">{txnReq.counterparty || txnReq.toAccount}</span>
+										<span class="text-surface-500 mx-1">|</span>
+										<span class="text-xs px-1 rounded {txnReq.status === 'COMPLETED' ? 'bg-success-700' : 'bg-warning-700'}">{txnReq.status}</span>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
+
+					{#if form.results.errors && form.results.errors.length > 0}
+						<div class="p-3 rounded-lg bg-error-900/30 border border-error-700">
+							<div class="flex items-center gap-2 mb-2">
+								<XCircle class="size-4 text-error-500" />
+								<span class="font-medium text-error-400">Errors: {form.results.errors.length}</span>
+							</div>
+							<ul class="text-sm text-error-300 ml-6 space-y-1 max-h-32 overflow-y-auto">
+								{#each form.results.errors as error}
+									<li class="truncate">{error}</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
 				</div>
 			{:else if form?.success && form.results}
 				<div class="space-y-4 max-h-[60vh] overflow-y-auto">
