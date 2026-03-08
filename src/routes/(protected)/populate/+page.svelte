@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageData, ActionData } from './$types';
+	import { buildAppUrls } from '$lib/obp/appDirectory';
 	import {
 		Database,
 		Loader2,
@@ -96,16 +97,32 @@
 		return form.results.errors.join('\n');
 	}
 
-	function getTransactionUrl(txn: { transaction_id: string; bank_id: string; from_account_id: string }) {
-		return `/transaction/${txn.bank_id}/${txn.from_account_id}/${txn.transaction_id}`;
-	}
+	// API Manager URL from app directory
+	const appUrls = buildAppUrls(data.appDirectory || []);
+	const apiManagerBase = appUrls.apiManager || '';
 
 	function getBankUrl(bank: { bank_id: string }) {
-		return `/banks/${bank.bank_id}`;
+		return `${apiManagerBase}/banks/${bank.bank_id}`;
 	}
 
 	function getAccountUrl(account: { account_id: string; bank_id: string }) {
-		return `/account/${account.bank_id}/${account.account_id}`;
+		return `${apiManagerBase}/account-access/accounts/${account.bank_id}/${account.account_id}/owner`;
+	}
+
+	function getTransactionUrl(txn: { bank_id: string; from_account_id: string }) {
+		return `${apiManagerBase}/account-access/accounts/${txn.bank_id}/${txn.from_account_id}/owner/transactions`;
+	}
+
+	function getCounterpartyUrl(cp: { bank_id: string; account_id: string }) {
+		return `${apiManagerBase}/account-access/accounts/${cp.bank_id}/${cp.account_id}/owner/counterparties`;
+	}
+
+	function getCustomersUrl(type: 'individual' | 'corporate') {
+		return `${apiManagerBase}/customers/${type}`;
+	}
+
+	function getFxRatesUrl() {
+		return `${apiManagerBase}/banks/fx-rates`;
 	}
 
 	// Check if there's any existing data
@@ -151,9 +168,6 @@
 		return data.existing.transactions.map(t => `transaction_id: ${t.transaction_id}, amount: ${t.amount}`).join('\n');
 	}
 
-	function getCounterpartyUrl(cp: { counterparty_id: string; bank_id: string; account_id: string }) {
-		return `/counterparty/${cp.bank_id}/${cp.account_id}/${cp.counterparty_id}`;
-	}
 </script>
 
 <div class="p-8 w-full">
@@ -554,7 +568,7 @@
 										{/if}
 										<a
 											href={getBankUrl(bank)}
-											class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
 										>
 											<code class="text-xs bg-surface-700 text-surface-100 px-1 rounded">{bank.bank_id}</code>
 											<ExternalLink class="size-3" />
@@ -606,7 +620,7 @@
 										{/if}
 										<a
 											href={getAccountUrl(account)}
-											class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
 										>
 											<code class="text-xs bg-surface-700 text-surface-100 px-1 rounded">{account.account_id}</code>
 											<ExternalLink class="size-3" />
@@ -660,7 +674,7 @@
 										{/if}
 										<a
 											href={getCounterpartyUrl(cp)}
-											class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
 										>
 											<span>{cp.name}</span>
 											<ExternalLink class="size-3" />
@@ -713,7 +727,13 @@
 										{:else}
 											<UserCheck class="size-3 text-tertiary-400" />
 										{/if}
-										<span class="text-surface-300">{cust.legal_name}</span>
+										<a
+											href={getCustomersUrl(cust.customer_type === 'CORPORATE' ? 'corporate' : 'individual')}
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+										>
+											<span>{cust.legal_name}</span>
+											<ExternalLink class="size-3" />
+										</a>
 										<span class="text-surface-500 mx-1">|</span>
 										<span class="text-xs px-1 rounded {cust.customer_type === 'CORPORATE' ? 'bg-tertiary-700' : 'bg-secondary-700'}">{cust.customer_type}</span>
 									</li>
@@ -809,7 +829,7 @@
 										{/if}
 										<a
 											href={getTransactionUrl(txn)}
-											class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
 										>
 											<code class="text-xs bg-surface-700 text-surface-100 px-1 rounded">{txn.transaction_id}</code>
 											<ExternalLink class="size-3" />
@@ -890,7 +910,7 @@
 									<li class="flex items-center gap-1">
 										<a
 											href={getBankUrl(bank)}
-											class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
 										>
 											<code class="text-xs bg-surface-700 text-surface-100 px-1 rounded">{bank.bank_id}</code>
 											<ExternalLink class="size-3" />
@@ -929,7 +949,7 @@
 									<li class="flex items-center gap-1">
 										<a
 											href={getAccountUrl(account)}
-											class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
 										>
 											<code class="text-xs bg-surface-700 text-surface-100 px-1 rounded">{account.account_id}</code>
 											<ExternalLink class="size-3" />
@@ -972,7 +992,7 @@
 									<li class="flex items-center gap-1">
 										<a
 											href={getCounterpartyUrl(cp)}
-											class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
 										>
 											<span>{cp.name}</span>
 											<ExternalLink class="size-3" />
@@ -1012,7 +1032,13 @@
 										{:else}
 											<UserCheck class="size-3 text-tertiary-400" />
 										{/if}
-										<span class="text-surface-300">{cust.legal_name}</span>
+										<a
+											href={getCustomersUrl(cust.customer_type === 'CORPORATE' ? 'corporate' : 'individual')}
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+										>
+											<span>{cust.legal_name}</span>
+											<ExternalLink class="size-3" />
+										</a>
 										<span class="text-surface-500 mx-1">|</span>
 										<span class="text-xs px-1 rounded {cust.customer_type === 'CORPORATE' ? 'bg-tertiary-700' : 'bg-secondary-700'}">{cust.customer_type}</span>
 									</li>
@@ -1079,7 +1105,7 @@
 									<li class="flex items-center gap-1">
 										<a
 											href={getTransactionUrl(txn)}
-											class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
+											target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:text-primary-300 flex items-center gap-1"
 										>
 											<code class="text-xs bg-surface-700 text-surface-100 px-1 rounded">{txn.transaction_id}</code>
 											<ExternalLink class="size-3" />
