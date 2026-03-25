@@ -15,9 +15,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/static ./static
 RUN chown -R sveltekit:sveltekit /app
 USER sveltekit
-EXPOSE 3000
+EXPOSE ${PORT:-5178}
 
 ENV NODE_ENV=production
-ENV PORT=3000
 
 CMD ["node", "build"]

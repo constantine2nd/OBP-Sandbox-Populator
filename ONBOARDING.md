@@ -131,7 +131,7 @@ The equivalent Python data lives in `data/botswana_businesses.py` and is only us
 
 Sessions are stored in Redis with the key prefix `sandbox-populator-session:`. The session name cookie is `sandbox-populator-connect.sid`. Session configuration is in `hooks.server.ts`.
 
-In Docker Compose, Redis uses AOF persistence so sessions survive container restarts during development. In production you may want to configure a TTL.
+Docker Compose uses `network_mode: host` and connects to the Redis instance already running on the host machine — no Redis container is included. Make sure Redis is running locally before starting the app.
 
 ## Adding a New OAuth Provider
 
@@ -145,21 +145,21 @@ In Docker Compose, Redis uses AOF persistence so sessions survive container rest
 See `.env.example` for all variables with inline comments. The key ones during development:
 
 ```env
-# Point at your local or staging OBP instance
-PUBLIC_OBP_BASE_URL=http://localhost:8080
-
 # Register an OAuth application in OBP to get these
 OBP_OAUTH_CLIENT_ID=your_id
 OBP_OAUTH_CLIENT_SECRET=your_secret
 
 # Must match what you registered as the redirect URI in OBP
+# Use port 5178 for local dev, 3000 for Docker
 APP_CALLBACK_URL=http://localhost:5178/login/obp/callback
 ORIGIN=http://localhost:5178
 
-# Redis (defaults work with docker-compose)
+# Redis — must be running on the host in both local dev and Docker modes
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ```
+
+`PUBLIC_OBP_BASE_URL` defaults to `http://localhost:8080` in both modes — Docker Compose uses `network_mode: host` so `localhost` inside the container is your host machine.
 
 ## Running the Legacy Python Scripts
 

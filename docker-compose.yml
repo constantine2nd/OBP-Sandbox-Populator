@@ -5,35 +5,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    network_mode: host  # shares host network so localhost:8080 (OBP) and localhost:6379 (Redis) are reachable
     environment:
       - NODE_ENV=production
-      - ORIGIN=http://localhost:3000
-      - PUBLIC_OBP_BASE_URL=${PUBLIC_OBP_BASE_URL:-http://host.docker.internal:8080}
+      - PORT=${PORT:-5178}
+      - ORIGIN=http://localhost:${PORT:-5178}
+      - PUBLIC_OBP_BASE_URL=http://localhost:8080
       - OBP_OAUTH_CLIENT_ID=${OBP_OAUTH_CLIENT_ID}
       - OBP_OAUTH_CLIENT_SECRET=${OBP_OAUTH_CLIENT_SECRET}
-      - APP_CALLBACK_URL=${APP_CALLBACK_URL:-http://localhost:3000/login/obp/callback}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - redis
-    networks:
-      - sandbox-populator-network
-
-  redis:
-    image: redis:6.2-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    networks:
-      - sandbox-populator-network
-    command: redis-server --appendonly yes
-
-networks:
-  sandbox-populator-network:
-    driver: bridge
-
-volumes:
-  redis-data:
+      - APP_CALLBACK_URL=${APP_CALLBACK_URL:-http://localhost:${PORT:-5178}/login/obp/callback}
+      - REDIS_HOST=localhost  # host network mode: Redis is reachable via localhost
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}

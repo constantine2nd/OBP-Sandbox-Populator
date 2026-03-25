@@ -25,7 +25,7 @@ try {
 }
 
 export default defineConfig({
-	server: { port: 5178 },
+	server: { port: parseInt(process.env.PORT ?? '5178') },
 	define: {
 		__APP_VERSION__: JSON.stringify(version),
 		__GIT_COMMIT__: JSON.stringify(gitCommit),

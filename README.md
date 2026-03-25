@@ -8,9 +8,15 @@ A tool for quickly creating and populating [Open Bank Project](https://www.openb
 - **CSV bulk import** — create banks, accounts, customers, and transactions from CSV files
 - **Realistic data generation** — Botswana, Singapore, and other country data sets with business names, currencies, and transaction patterns
 - **OAuth2 authentication** — connects to OBP using your own credentials
-- **One-command deployment** — Docker Compose setup with Redis included
+- **One-command deployment** — Docker Compose setup (requires a local Redis and OBP instance on the host)
 
 ## Quick Start (Docker)
+
+Prerequisites:
+- OBP API running on your host at `http://localhost:8080`
+- Redis running on your host at `localhost:6379`
+
+The Docker Compose setup uses `network_mode: host` so the app container shares your host network and reaches both services via `localhost`. No separate Redis container is started.
 
 1. Copy the environment template and fill in your values:
 
@@ -21,14 +27,11 @@ A tool for quickly creating and populating [Open Bank Project](https://www.openb
 2. At minimum, set the following in `.env`:
 
    ```env
-   PUBLIC_OBP_BASE_URL=https://your-obp-instance.example.com
    OBP_OAUTH_CLIENT_ID=your_client_id
    OBP_OAUTH_CLIENT_SECRET=your_client_secret
-   APP_CALLBACK_URL=http://localhost:3000/login/obp/callback
-   ORIGIN=http://localhost:3000
    ```
 
-3. Start the stack:
+3. Start the app:
 
    ```bash
    docker-compose up
