@@ -29,6 +29,8 @@ import type {
 	PersonalDataFieldsResponse,
 	CreatePersonalDataFieldPayload,
 	User,
+	CreateUserPayload,
+	CreateUserResponse,
 	AppDirectoryEntry,
 	AppDirectoryResponse
 } from './types';
@@ -79,6 +81,15 @@ export class OBPClient {
 	}
 
 	// User endpoints
+	async createUser(payload: CreateUserPayload): Promise<CreateUserResponse> {
+		const response = await fetch(this.url('/users'), {
+			method: 'POST',
+			headers: this.getHeaders(),
+			body: JSON.stringify(payload)
+		});
+		return this.handleResponse<CreateUserResponse>(response);
+	}
+
 	async getCurrentUser(): Promise<User> {
 		const response = await fetch(this.url('/users/current'), {
 			headers: this.getHeaders()

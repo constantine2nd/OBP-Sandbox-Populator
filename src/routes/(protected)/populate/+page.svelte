@@ -34,6 +34,7 @@
 	let previewData = $state<any>(null);
 	let numBanks = $state(data.defaults.numBanks);
 	let numAccountsPerBank = $state(data.defaults.numAccountsPerBank);
+	let numUsers = $state(data.defaults.numUsers);
 	let countryCode = $state(data.defaults.countryCode);
 	let currency = $state(data.defaults.currency);
 	let bankIdPrefix = $state(data.defaults.bankIdPrefix);
@@ -54,6 +55,8 @@
 	let createCustomers = $state(true);
 	let createFxRates = $state(true);
 	let createTransactions = $state(true);
+	let createUsers = $state(true);
+	let createUserCustomerLinks = $state(true);
 
 	// Copy states for each section
 	let copiedSection = $state<string | null>(null);
@@ -94,6 +97,16 @@
 	function formatTransactions() {
 		if (!form?.results?.transactions) return '';
 		return form.results.transactions.map(t => `transaction_id: ${t.transaction_id}, amount: ${t.amount}`).join('\n');
+	}
+
+	function formatUsers() {
+		if (!form?.results?.users) return '';
+		return form.results.users.map(u => `username: ${u.username}, email: ${u.email}`).join('\n');
+	}
+
+	function formatUserCustomerLinks() {
+		if (!form?.results?.userCustomerLinks) return '';
+		return form.results.userCustomerLinks.map(l => `${l.username} → ${l.legal_name}`).join('\n');
 	}
 
 	function formatErrors() {
@@ -270,7 +283,7 @@
 					</div>
 				</div>
 
-				<!-- Accounts per Bank -->
+				<!-- Accounts per Bank & Number of Users -->
 				<div class="grid grid-cols-2 gap-4">
 					<div>
 						<label for="numAccountsPerBank" class="block text-sm font-medium mb-1">Accounts per Bank</label>
@@ -281,6 +294,19 @@
 							bind:value={numAccountsPerBank}
 							min="1"
 							max="10"
+							class="input w-full"
+							disabled={isLoading}
+						/>
+					</div>
+					<div>
+						<label for="numUsers" class="block text-sm font-medium mb-1">Number of Users</label>
+						<input
+							type="number"
+							id="numUsers"
+							name="numUsers"
+							bind:value={numUsers}
+							min="1"
+							max="20"
 							class="input w-full"
 							disabled={isLoading}
 						/>
@@ -346,6 +372,34 @@
 						<span class="flex items-center gap-2">
 							<History class="size-4 text-tertiary-500" />
 							Create Historical Transactions (12 months)
+						</span>
+					</label>
+
+					<label class="flex items-center gap-3 cursor-pointer">
+						<input
+							type="checkbox"
+							name="createUsers"
+							bind:checked={createUsers}
+							class="checkbox"
+							disabled={isLoading}
+						/>
+						<span class="flex items-center gap-2">
+							<Users class="size-4 text-tertiary-500" />
+							Create Users (password: <code class="bg-surface-700 px-1 rounded text-xs">Test1234!</code>)
+						</span>
+					</label>
+
+					<label class="flex items-center gap-3 cursor-pointer">
+						<input
+							type="checkbox"
+							name="createUserCustomerLinks"
+							bind:checked={createUserCustomerLinks}
+							class="checkbox"
+							disabled={isLoading || !createUsers}
+						/>
+						<span class="flex items-center gap-2">
+							<UserCheck class="size-4 text-tertiary-500" />
+							Create User-Customer Links
 						</span>
 					</label>
 				</div>
@@ -434,6 +488,14 @@
 						<div class="card p-2 preset-filled-surface-200-800 text-center">
 							<div class="text-lg font-bold text-secondary-400">{preview.summary.transactions}</div>
 							<div class="text-surface-400">Transactions</div>
+						</div>
+						<div class="card p-2 preset-filled-surface-200-800 text-center">
+							<div class="text-lg font-bold text-secondary-400">{preview.summary.users}</div>
+							<div class="text-surface-400">Users</div>
+						</div>
+						<div class="card p-2 preset-filled-surface-200-800 text-center">
+							<div class="text-lg font-bold text-secondary-400">{preview.summary.userCustomerLinks}</div>
+							<div class="text-surface-400">User Links</div>
 						</div>
 					</div>
 
@@ -560,6 +622,18 @@
 							<li class="flex items-center gap-3">
 								<Loader2 class="size-4 animate-spin text-primary-400" />
 								<span>Generating 12 months of historical transactions...</span>
+							</li>
+						{/if}
+						{#if createUsers}
+							<li class="flex items-center gap-3">
+								<Loader2 class="size-4 animate-spin text-primary-400" />
+								<span>Creating {numUsers} user{numUsers > 1 ? 's' : ''}...</span>
+							</li>
+						{/if}
+						{#if createUsers && createUserCustomerLinks}
+							<li class="flex items-center gap-3">
+								<Loader2 class="size-4 animate-spin text-primary-400" />
+								<span>Linking users to customers...</span>
 							</li>
 						{/if}
 					</ul>
@@ -932,6 +1006,94 @@
 							</ul>
 						{/if}
 					</div>
+
+					<!-- Users -->
+					{#if form.results.users && form.results.users.length > 0}
+						<div class="p-3 rounded-lg bg-surface-800/50">
+							<div class="flex items-center justify-between mb-2">
+								<div class="flex items-center gap-2">
+									<Users class="size-4 text-secondary-500" />
+									<span class="font-medium">Users: {form.results.users.length}</span>
+									{#if form.results.users.filter(u => !u.existed).length > 0}
+										<span class="text-xs text-success-400">{form.results.users.filter(u => !u.existed).length} new</span>
+									{/if}
+									{#if form.results.users.filter(u => u.existed).length > 0}
+										<span class="text-xs text-warning-400">{form.results.users.filter(u => u.existed).length} existing</span>
+									{/if}
+								</div>
+								<button
+									type="button"
+									onclick={() => copyToClipboard('users', formatUsers())}
+									class="btn btn-sm preset-tonal flex items-center gap-1"
+									title="Copy users"
+								>
+									{#if copiedSection === 'users'}
+										<Check class="size-3" />
+									{:else}
+										<Copy class="size-3" />
+									{/if}
+								</button>
+							</div>
+							<ul class="text-sm text-surface-400 ml-6 space-y-1 max-h-24 overflow-y-auto">
+								{#each form.results.users as usr}
+									<li class="flex items-center gap-1">
+										{#if usr.existed}
+											<span title="Already existed"><RotateCcw class="size-3 text-warning-400" /></span>
+										{:else}
+											<span title="Newly created"><Plus class="size-3 text-success-400" /></span>
+										{/if}
+										<code class="text-xs bg-surface-700 text-surface-100 px-1 rounded">{usr.username}</code>
+										<span class="text-surface-500 mx-1">|</span>
+										<span class="text-surface-300">{usr.email}</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+
+					<!-- User-Customer Links -->
+					{#if form.results.userCustomerLinks && form.results.userCustomerLinks.length > 0}
+						<div class="p-3 rounded-lg bg-surface-800/50">
+							<div class="flex items-center justify-between mb-2">
+								<div class="flex items-center gap-2">
+									<UserCheck class="size-4 text-secondary-500" />
+									<span class="font-medium">User-Customer Links: {form.results.userCustomerLinks.length}</span>
+									{#if form.results.userCustomerLinks.filter(l => !l.existed).length > 0}
+										<span class="text-xs text-success-400">{form.results.userCustomerLinks.filter(l => !l.existed).length} new</span>
+									{/if}
+									{#if form.results.userCustomerLinks.filter(l => l.existed).length > 0}
+										<span class="text-xs text-warning-400">{form.results.userCustomerLinks.filter(l => l.existed).length} existing</span>
+									{/if}
+								</div>
+								<button
+									type="button"
+									onclick={() => copyToClipboard('userCustomerLinks', formatUserCustomerLinks())}
+									class="btn btn-sm preset-tonal flex items-center gap-1"
+									title="Copy user-customer links"
+								>
+									{#if copiedSection === 'userCustomerLinks'}
+										<Check class="size-3" />
+									{:else}
+										<Copy class="size-3" />
+									{/if}
+								</button>
+							</div>
+							<ul class="text-sm text-surface-400 ml-6 space-y-1 max-h-24 overflow-y-auto">
+								{#each form.results.userCustomerLinks as link}
+									<li class="flex items-center gap-1">
+										{#if link.existed}
+											<span title="Already existed"><RotateCcw class="size-3 text-warning-400" /></span>
+										{:else}
+											<span title="Newly created"><Plus class="size-3 text-success-400" /></span>
+										{/if}
+										<code class="text-xs bg-surface-700 text-surface-100 px-1 rounded">{link.username}</code>
+										<span class="text-surface-400 mx-1">→</span>
+										<span class="text-surface-300">{link.legal_name}</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
 
 					<!-- Errors -->
 					{#if form.results.errors && form.results.errors.length > 0}
