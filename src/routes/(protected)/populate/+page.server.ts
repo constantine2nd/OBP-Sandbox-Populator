@@ -254,6 +254,18 @@ export const actions: Actions = {
 			accessToken
 		);
 
+		// Fetch current user fresh from OBP (populate action) to get the authoritative user_id matching
+		// the current access token (session data may be stale after token refresh or OBP DB reset)
+		let currentUser: typeof user;
+		try {
+			currentUser = await client.getCurrentUser();
+		} catch (e: any) {
+			logger.error('Failed to fetch current user from OBP:', e.message);
+			return fail(401, { error: `Your OBP user account could not be found. Please log out and log in again. (${e.message})` });
+		}
+		// Use the freshly fetched user_id for all subsequent operations
+		const effectiveUser = { ...user, user_id: currentUser.user_id };
+
 		// Save settings to session and OBP Personal Data Fields
 		try {
 			await session.setData({
@@ -330,7 +342,7 @@ export const actions: Actions = {
 			logger.info(`Creating ${numBanks} banks...`);
 			for (let i = 1; i <= numBanks; i++) {
 				const bankId = `${bankIdPrefix}.bnk.${i}`;
-				const bankName = `${user.username} Test Bank ${i}`;
+				const bankName = `${effectiveUser.username} Test Bank ${i}`;
 
 				const bank_code = `${bankIdPrefix}${i}${countryCode}`;
 				try {
@@ -350,7 +362,7 @@ export const actions: Actions = {
 						// Grant entitlements at new bank
 						for (const role of ['CanCreateAccount', 'CanCreateHistoricalTransactionAtBank', 'CanCreateCustomer', 'CanGetCustomersAtOneBank', 'CanCreateUserCustomerLink', 'CanGetUserCustomerLink']) {
 							try {
-								await client.createEntitlement(user.user_id, bank.bank_id, role);
+								await client.createEntitlement(effectiveUser.user_id, bank.bank_id, role);
 								logger.info(`Granted ${role} at ${bank.bank_id}`);
 							} catch (entErr: any) {
 								const errorMsg = `Could not grant ${role} at ${bank.bank_id}: ${entErr.message}`;
@@ -408,7 +420,7 @@ export const actions: Actions = {
 								label: label,
 								currency: currency,
 								balance: { amount: '0', currency: currency },
-								user_id: user.user_id
+								user_id: effectiveUser.user_id
 							});
 							logger.debug('Account creation response:', JSON.stringify(account));
 							results.accounts.push({
@@ -497,14 +509,14 @@ export const actions: Actions = {
 				// Get existing user-customer links
 				let existingLinks: Array<{ customer_id: string }> = [];
 				try {
-					const linksResponse = await client.getUserCustomerLinksByUserId(firstBank.bank_id, user.user_id);
+					const linksResponse = await client.getUserCustomerLinksByUserId(firstBank.bank_id, effectiveUser.user_id);
 					existingLinks = linksResponse.user_customer_links || [];
 				} catch (e: any) {
 					logger.warn(`Could not fetch user-customer links: ${e.message}`);
 				}
 
 				// --- Create "My" individual customer for the logged-in user ---
-				const myIndividualName = `${user.username} (Individual)`;
+				const myIndividualName = `${effectiveUser.username} (Individual)`;
 				try {
 					const existingMy = existingCustomers.find(c => c.legal_name === myIndividualName);
 					if (existingMy) {
@@ -520,7 +532,7 @@ export const actions: Actions = {
 						const myCustomer = await client.createCustomer(firstBank.bank_id, {
 							legal_name: myIndividualName,
 							mobile_phone_number: '+267 70 000 0001',
-							email: user.email || `${user.username}@example.bw`,
+							email: effectiveUser.email || `${effectiveUser.username}@example.bw`,
 							kyc_status: true,
 							credit_limit: { currency, amount: '50000' },
 							credit_rating: { rating: 'A', source: 'OBP' },
@@ -540,7 +552,7 @@ export const actions: Actions = {
 						if (!alreadyLinked) {
 							try {
 								await client.createUserCustomerLink(firstBank.bank_id, {
-									user_id: user.user_id,
+									user_id: effectiveUser.user_id,
 									customer_id: myCustomer.customer_id
 								});
 								logger.info(`Linked user to individual customer ${myCustomer.customer_id}`);
@@ -558,7 +570,7 @@ export const actions: Actions = {
 				await delay(100);
 
 				// --- Create "My" corporate customer for the logged-in user ---
-				const myCorporateName = `${user.username} Corp (Pty) Ltd`;
+				const myCorporateName = `${effectiveUser.username} Corp (Pty) Ltd`;
 				try {
 					const existingMyCorp = existingCustomers.find(c => c.legal_name === myCorporateName);
 					if (existingMyCorp) {
@@ -574,7 +586,7 @@ export const actions: Actions = {
 						const myCorpCustomer = await client.createCorporateCustomer(firstBank.bank_id, {
 							legal_name: myCorporateName,
 							mobile_phone_number: '+267 31 000 0001',
-							email: `corp-${user.username}@example.bw`,
+							email: `corp-${effectiveUser.username}@example.bw`,
 							kyc_status: true,
 							credit_limit: { currency, amount: '1000000' },
 							credit_rating: { rating: 'AAA', source: 'OBP' },
@@ -594,7 +606,7 @@ export const actions: Actions = {
 						if (!alreadyLinked) {
 							try {
 								await client.createUserCustomerLink(firstBank.bank_id, {
-									user_id: user.user_id,
+									user_id: effectiveUser.user_id,
 									customer_id: myCorpCustomer.customer_id
 								});
 								logger.info(`Linked user to corporate customer ${myCorpCustomer.customer_id}`);
@@ -848,7 +860,7 @@ export const actions: Actions = {
 			// Create Users
 			if (createUsers) {
 				logger.info(`Creating ${numUsers} users...`);
-				const TEST_PASSWORD = 'Test1234!';
+				const TEST_PASSWORD = 'Test12345!';
 				const individualData = getIndividualCustomers(countryCode, numUsers);
 
 				for (let i = 1; i <= numUsers; i++) {
