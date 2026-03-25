@@ -255,6 +255,7 @@ export interface CreateCorporateCustomerPayload {
 	branch_id?: string;
 	customer_type?: string;
 	parent_customer_id?: string;
+	category?: string;
 }
 
 // User Customer Link Types

@@ -22,12 +22,16 @@
 		UserCheck,
 		Building2
 	} from '@lucide/svelte';
+	import { deserialize } from '$app/forms';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let isLoading = $state(false);
+	let isLoadingPreview = $state(false);
 	let isLoadingCounterpartyTxn = $state(false);
 	let isLoadingAccountTxn = $state(false);
+	let showPreview = $state(false);
+	let previewData = $state<any>(null);
 	let numBanks = $state(data.defaults.numBanks);
 	let numAccountsPerBank = $state(data.defaults.numAccountsPerBank);
 	let countryCode = $state(data.defaults.countryCode);
@@ -346,20 +350,107 @@
 					</label>
 				</div>
 
-				<button
-					type="submit"
-					class="btn preset-filled-primary-500 w-full mt-6"
-					disabled={isLoading || isLoadingCounterpartyTxn || isLoadingAccountTxn}
-				>
-					{#if isLoading}
-						<Loader2 class="size-5 animate-spin mr-2" />
-						Populating...
-					{:else}
-						<Database class="size-5 mr-2" />
-						Populate Sandbox
-					{/if}
-				</button>
+				<div class="grid grid-cols-2 gap-3 mt-6">
+					<!-- Preview button — separate form, same fields, different action -->
+					<button
+						type="button"
+						formaction="?/preview"
+						class="btn preset-outlined-surface-500 w-full"
+						disabled={isLoading || isLoadingPreview || isLoadingCounterpartyTxn || isLoadingAccountTxn}
+						onclick={async (e) => {
+							isLoadingPreview = true;
+							const formEl = e.currentTarget.closest('form') as HTMLFormElement;
+							const formData = new FormData(formEl);
+							const response = await fetch('?/preview', { method: 'POST', body: formData });
+							const result = deserialize(await response.text());
+							if (result.type === 'success' && (result.data as any)?.preview) {
+								previewData = (result.data as any).preview;
+								showPreview = true;
+							}
+							isLoadingPreview = false;
+						}}
+					>
+						{#if isLoadingPreview}
+							<Loader2 class="size-4 animate-spin mr-2" />
+							Previewing...
+						{:else}
+							<Send class="size-4 mr-2" />
+							Preview
+						{/if}
+					</button>
+
+					<button
+						type="submit"
+						class="btn preset-filled-primary-500 w-full"
+						disabled={isLoading || isLoadingPreview || isLoadingCounterpartyTxn || isLoadingAccountTxn}
+					>
+						{#if isLoading}
+							<Loader2 class="size-5 animate-spin mr-2" />
+							Populating...
+						{:else}
+							<Database class="size-5 mr-2" />
+							Populate Sandbox
+						{/if}
+					</button>
+				</div>
 			</form>
+
+			<!-- Preview Panel -->
+			{#if showPreview && previewData}
+				{@const preview = previewData}
+				<div class="mt-6 card p-4 preset-filled-surface-100-900 border border-surface-500">
+					<div class="flex items-center justify-between mb-3">
+						<h3 class="font-semibold flex items-center gap-2">
+							<Send class="size-4 text-secondary-400" />
+							Preview — what will be created
+						</h3>
+						<button class="btn btn-sm preset-outlined-surface-500" onclick={() => showPreview = false}>
+							Close
+						</button>
+					</div>
+
+					<!-- Summary -->
+					<div class="grid grid-cols-3 gap-2 mb-4 text-sm">
+						<div class="card p-2 preset-filled-surface-200-800 text-center">
+							<div class="text-lg font-bold text-secondary-400">{preview.summary.banks}</div>
+							<div class="text-surface-400">Banks</div>
+						</div>
+						<div class="card p-2 preset-filled-surface-200-800 text-center">
+							<div class="text-lg font-bold text-secondary-400">{preview.summary.accounts}</div>
+							<div class="text-surface-400">Accounts</div>
+						</div>
+						<div class="card p-2 preset-filled-surface-200-800 text-center">
+							<div class="text-lg font-bold text-secondary-400">{preview.summary.customers}</div>
+							<div class="text-surface-400">Customers</div>
+						</div>
+						<div class="card p-2 preset-filled-surface-200-800 text-center">
+							<div class="text-lg font-bold text-secondary-400">{preview.summary.counterparties}</div>
+							<div class="text-surface-400">Counterparties</div>
+						</div>
+						<div class="card p-2 preset-filled-surface-200-800 text-center">
+							<div class="text-lg font-bold text-secondary-400">{preview.summary.fxRatePairs}</div>
+							<div class="text-surface-400">FX Pairs</div>
+						</div>
+						<div class="card p-2 preset-filled-surface-200-800 text-center">
+							<div class="text-lg font-bold text-secondary-400">{preview.summary.transactions}</div>
+							<div class="text-surface-400">Transactions</div>
+						</div>
+					</div>
+
+					<p class="text-xs text-surface-400 mb-3">
+						Total: <strong>{preview.summary.total}</strong> entities will be created in OBP.
+						{#if preview.transactions}
+							Transaction amounts are randomised at populate time.
+						{/if}
+					</p>
+
+					<!-- Full JSON -->
+					<details class="text-xs">
+						<summary class="cursor-pointer text-surface-400 hover:text-white mb-2">Show full JSON plan</summary>
+						<pre class="bg-surface-900 p-3 rounded overflow-auto max-h-96 text-xs">{JSON.stringify(preview, null, 2)}</pre>
+					</details>
+				</div>
+			{/if}
 
 			<hr class="border-surface-700 my-4" />
 

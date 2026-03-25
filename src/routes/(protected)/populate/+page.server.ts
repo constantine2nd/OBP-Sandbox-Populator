@@ -850,6 +850,96 @@ export const actions: Actions = {
 		}
 	},
 
+	preview: async ({ request, locals }) => {
+		const user = locals.session?.data?.user;
+		if (!user) return fail(401, { error: 'Not authenticated' });
+
+		const formData = await request.formData();
+		const numBanks = parseInt(formData.get('numBanks') as string) || 2;
+		const numAccountsPerBank = parseInt(formData.get('numAccountsPerBank') as string) || 5;
+		const currency = (formData.get('currency') as string) || 'BWP';
+		const countryCode = (formData.get('country') as string) || 'BW';
+		const bankIdPrefix = (formData.get('bankIdPrefix') as string) || getUsernamePrefix(user.username);
+		const withCounterparties = formData.get('createCounterparties') === 'on';
+		const withCustomers = formData.get('createCustomers') === 'on';
+		const withFxRates = formData.get('createFxRates') === 'on';
+		const withTransactions = formData.get('createTransactions') === 'on';
+
+		// Banks
+		const banks = Array.from({ length: numBanks }, (_, i) => ({
+			bank_id: `${bankIdPrefix}.bnk.${i + 1}`,
+			full_name: `${user.username} Test Bank ${i + 1}`,
+			bank_code: `${bankIdPrefix}${i + 1}${countryCode}`
+		}));
+
+		// Accounts
+		const accounts = banks.flatMap(bank =>
+			Array.from({ length: numAccountsPerBank }, (_, j) => ({
+				bank_id: bank.bank_id,
+				label: `Account ${j + 1}`,
+				currency
+			}))
+		);
+
+		// Counterparties
+		const counterparties = withCounterparties
+			? getBusinesses(countryCode, 10).map(b => ({ name: b.name, industry: b.industry }))
+			: [];
+
+		// Customers
+		const customers = withCustomers ? [
+			{ legal_name: `${user.username} (Individual)`, type: 'INDIVIDUAL', note: 'your individual customer' },
+			{ legal_name: `${user.username} Corp (Pty) Ltd`, type: 'CORPORATE', note: 'your corporate customer' },
+			...getIndividualCustomers(countryCode, 5).map(c => ({ legal_name: c.legal_name, type: 'INDIVIDUAL', note: 'sample' })),
+			...getCorporateCustomers(countryCode, 5).map(c => ({ legal_name: c.legal_name, type: 'CORPORATE', note: 'sample' }))
+		] : [];
+
+		// FX rates
+		const fxRatePairs = withFxRates
+			? banks.flatMap(bank =>
+				Object.entries(FX_RATES).flatMap(([target, rate]) => [
+					{ bank_id: bank.bank_id, from: currency, to: target, rate },
+					{ bank_id: bank.bank_id, from: target, to: currency, rate: parseFloat((1 / rate).toFixed(6)) }
+				])
+			)
+			: [];
+
+		// Transactions — amounts are random at runtime, describe count only
+		const transactionCount = withTransactions
+			? banks.filter(b => accounts.filter(a => a.bank_id === b.bank_id).length >= 2).length * 12
+			: 0;
+
+		const totalEntities =
+			banks.length +
+			accounts.length +
+			counterparties.length +
+			customers.length +
+			fxRatePairs.length +
+			transactionCount;
+
+		return {
+			preview: {
+				banks,
+				accounts,
+				counterparties,
+				customers,
+				fxRatePairs,
+				transactions: withTransactions
+					? { count: transactionCount, note: '12 monthly historical transactions per bank, amounts are random at populate time' }
+					: null,
+				summary: {
+					banks: banks.length,
+					accounts: accounts.length,
+					counterparties: counterparties.length,
+					customers: customers.length,
+					fxRatePairs: fxRatePairs.length,
+					transactions: transactionCount,
+					total: totalEntities
+				}
+			}
+		};
+	},
+
 	createCounterpartyTransactionRequests: async ({ locals }) => {
 		const session = locals.session;
 		const accessToken = session?.data?.oauth?.access_token;

@@ -69,7 +69,7 @@ export const actions: Actions = {
 			}
 
 			for (const row of parsed.rows) {
-				const bankId = row.bank_code.toLowerCase();
+				const bankId = row.bank_code; // already lowercased by parser
 				try {
 					const exists = await client.bankExists(bankId);
 					if (exists) {
@@ -120,12 +120,39 @@ export const actions: Actions = {
 				results.errors.push(...parsed.errors.map((e) => `accounts.csv: ${e}`));
 			}
 
+			// Pre-fetch existing accounts per bank to avoid duplicates
+			const existingAccountNumbers: Record<string, string> = {}; // "bank_code::number" -> account_id
+			const bankCodesInCsv = [...new Set(parsed.rows.map((r) => r.bank_code))];
+			for (const bankCode of bankCodesInCsv) {
+				const bankId = bankIdMap[bankCode];
+				if (!bankId) continue;
+				try {
+					const existing = await client.getAccountsAtBank(bankId);
+					for (const acc of existing.accounts) {
+						const numberRouting = acc.account_routings.find((r) => r.scheme === 'NUMBER');
+						if (numberRouting) {
+							existingAccountNumbers[`${bankCode}::${numberRouting.address}`] = acc.account_id;
+						}
+					}
+				} catch (e) {
+					logger.warn(`Could not pre-fetch accounts for bank ${bankId}`);
+				}
+			}
+
 			for (const row of parsed.rows) {
 				const bankId = bankIdMap[row.bank_code];
 				if (!bankId) {
 					results.errors.push(
 						`accounts.csv: bank_code '${row.bank_code}' not found. Make sure it matches a 'bank_code' in banks.csv.`
 					);
+					continue;
+				}
+
+				const existingId = existingAccountNumbers[`${row.bank_code}::${row.number}`];
+				if (existingId) {
+					accountIdMap[`${row.bank_code}::${row.number}`] = existingId;
+					results.accounts.push({ account_id: existingId, bank_code: row.bank_code, number: row.number, status: 'existed' });
+					logger.info(`Account ${row.number} at ${bankId} already exists, reusing`);
 					continue;
 				}
 
@@ -178,7 +205,8 @@ export const actions: Actions = {
 							legal_name: row.legal_name,
 							mobile_phone_number: row.mobile_phone_number,
 							email: row.email,
-							customer_type: 'CORPORATE'
+							customer_type: 'CORPORATE',
+							category: row.category
 						});
 						customerId = customer.customer_id;
 					} else {

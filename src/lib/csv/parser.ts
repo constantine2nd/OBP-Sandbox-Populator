@@ -121,7 +121,7 @@ export function parseBanksCsv(text: string): CsvParseResult<CsvBankRow> {
 		if (row.full_name && row.bank_code) {
 			parsed.push({
 				full_name: row.full_name,
-				bank_code: row.bank_code
+				bank_code: row.bank_code.toLowerCase()
 			});
 		}
 	}
@@ -142,7 +142,7 @@ export function parseAccountsCsv(text: string): CsvParseResult<CsvAccountRow> {
 		if (!row.currency) errors.push(`Row ${lineNum}: missing 'currency'`);
 		if (row.bank_code && row.number && row.currency) {
 			parsed.push({
-				bank_code: row.bank_code,
+				bank_code: row.bank_code.toLowerCase(),
 				number: row.number,
 				currency: row.currency,
 				legal_name: row.legal_name || undefined
@@ -180,7 +180,7 @@ export function parseCustomersCsv(text: string): CsvParseResult<CsvCustomerRow> 
 				highest_education_attained: row.highest_education_attained || undefined,
 				relationship_status: row.relationship_status || undefined,
 				category: row.category || undefined,
-				bank_code: row.bank_code
+				bank_code: row.bank_code.toLowerCase()
 			});
 		}
 	}
@@ -206,13 +206,18 @@ export function parseTransactionsCsv(text: string): CsvParseResult<CsvTransactio
 		if (row.amount && isNaN(parseFloat(row.amount))) {
 			errors.push(`Row ${lineNum}: 'amount' must be a number`);
 		}
-		if (row.date && row.from_account_number && row.from_bank_code && row.to_account_number && row.to_bank_code && row.amount && row.currency) {
+		if (row.date && isNaN(new Date(row.date).getTime())) {
+			errors.push(`Row ${lineNum}: 'date' is not a valid date (expected YYYY-MM-DD)`);
+		}
+		const dateValid = !row.date || !isNaN(new Date(row.date).getTime());
+		const amountValid = !row.amount || !isNaN(parseFloat(row.amount));
+		if (row.date && row.from_account_number && row.from_bank_code && row.to_account_number && row.to_bank_code && row.amount && row.currency && dateValid && amountValid) {
 			parsed.push({
 				date: row.date,
 				from_account_number: row.from_account_number,
-				from_bank_code: row.from_bank_code,
+				from_bank_code: row.from_bank_code.toLowerCase(),
 				to_account_number: row.to_account_number,
-				to_bank_code: row.to_bank_code,
+				to_bank_code: row.to_bank_code.toLowerCase(),
 				amount: row.amount,
 				currency: row.currency,
 				description: row.description || undefined

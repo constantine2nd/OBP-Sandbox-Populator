@@ -81,17 +81,16 @@ const checkAuthorization: Handle = async ({ event, resolve }) => {
 
 	if (!!routeId && needsAuthorization(routeId)) {
 		logger.debug('Checking authorization for user route:', event.url.pathname);
-		if (!oauth2ProviderManager.isReady()) {
-			logger.warn('OAuth2 providers not ready');
-			throw error(503, 'Service Unavailable. Please try again later.');
-		}
 
 		if (!session || !session.data.user) {
+			// Only block unauthenticated users if OAuth providers are unavailable
+			if (!oauth2ProviderManager.isReady()) {
+				logger.warn('OAuth2 providers not ready and user is not authenticated');
+				throw error(503, 'Service Unavailable. OAuth providers are not ready. Please try again later.');
+			}
 			return new Response(null, {
 				status: 302,
-				headers: {
-					Location: '/login'
-				}
+				headers: { Location: '/login' }
 			});
 		} else {
 			logger.debug('User is authenticated:', session.data.user);
