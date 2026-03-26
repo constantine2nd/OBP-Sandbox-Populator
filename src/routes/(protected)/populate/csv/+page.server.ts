@@ -40,6 +40,17 @@ export const actions: Actions = {
 
 		const client = new OBPClient(env.PUBLIC_OBP_BASE_URL, 'v6.0.0', accessToken);
 
+		// Fetch current user fresh from OBP to get the authoritative user_id matching
+		// the current access token (session data may be stale after token refresh or OBP DB reset)
+		let currentUser: typeof user;
+		try {
+			currentUser = await client.getCurrentUser();
+		} catch (e: any) {
+			logger.error('Failed to fetch current user from OBP:', e.message);
+			return fail(401, { error: `Your OBP user account could not be found. Please log out and log in again. (${e.message})` });
+		}
+		const effectiveUserId = currentUser.user_id;
+
 		const results: {
 			banks: Array<{ bank_id: string; name: string; status: string }>;
 			accounts: Array<{ account_id: string; bank_code: string; number: string; status: string }>;
@@ -95,7 +106,7 @@ export const actions: Actions = {
 						];
 						for (const role of roles) {
 							try {
-								await client.createEntitlement(user.user_id, bank.bank_id, role);
+								await client.createEntitlement(effectiveUserId, bank.bank_id, role);
 							} catch (entErr: any) {
 								logger.warn(`Could not grant ${role} at ${bank.bank_id}: ${entErr.message}`);
 							}
@@ -161,7 +172,7 @@ export const actions: Actions = {
 						label: row.number,
 						currency: row.currency,
 						balance: { currency: row.currency, amount: '0' },
-						user_id: user.user_id,
+						user_id: effectiveUserId,
 						account_routings: [{ scheme: 'NUMBER', address: row.number }]
 					});
 
@@ -174,8 +185,29 @@ export const actions: Actions = {
 					});
 					logger.info(`Created account: ${row.number} at ${bankId}`);
 				} catch (e: any) {
-					results.errors.push(`Failed to create account '${row.number}' at bank '${row.bank_code}': ${e.message}`);
-					logger.error(`Failed to create account:`, e);
+					// OBP-30115: routing already exists — account was created in a prior run.
+					// Re-fetch the bank's accounts and match by label (which equals the account number).
+					if (e.message?.includes('OBP-30115') || e.message?.includes('Account Routing already exist')) {
+						try {
+							const existing = await client.getAccountsAtBank(bankId);
+							const match = existing.accounts.find(
+								(a) => a.label === row.number ||
+									a.account_routings?.some((r) => r.scheme === 'NUMBER' && r.address === row.number)
+							);
+							if (match) {
+								accountIdMap[`${row.bank_code}::${row.number}`] = match.account_id;
+								results.accounts.push({ account_id: match.account_id, bank_code: row.bank_code, number: row.number, status: 'existed' });
+								logger.info(`Account ${row.number} at ${bankId} already existed (routing conflict), reusing ${match.account_id}`);
+							} else {
+								results.errors.push(`Failed to create account '${row.number}' at bank '${row.bank_code}': routing already exists but could not find the existing account.`);
+							}
+						} catch (fetchErr: any) {
+							results.errors.push(`Failed to create account '${row.number}' at bank '${row.bank_code}': ${e.message}`);
+						}
+					} else {
+						results.errors.push(`Failed to create account '${row.number}' at bank '${row.bank_code}': ${e.message}`);
+						logger.error(`Failed to create account:`, e);
+					}
 				}
 				await delay(100);
 			}
@@ -235,7 +267,7 @@ export const actions: Actions = {
 					// Link user to customer
 					try {
 						await client.createUserCustomerLink(bankId, {
-							user_id: user.user_id,
+							user_id: effectiveUserId,
 							customer_id: customerId
 						});
 					} catch (linkErr: any) {
@@ -326,7 +358,7 @@ export const actions: Actions = {
 					continue;
 				}
 
-				const postedDate = new Date(row.date).toISOString();
+				const postedDate = new Date(row.date).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 				try {
 					await client.createHistoricalTransaction(fromBankId, {

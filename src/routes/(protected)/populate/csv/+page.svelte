@@ -61,56 +61,56 @@
 		banks: {
 			filename: 'banks_template.csv',
 			content: `full_name,bank_code
-First National Bank,FNB
-Community Savings Bank,CSB`
+First National Bank,FNB.
+Community Savings Bank,CSB.`
 		},
 		accounts: {
 			filename: 'accounts_template.csv',
 			content: `bank_code,number,currency,legal_name
-FNB,10010001,USD,Jane Smith
-FNB,10010002,USD,Jane Smith
-CSB,20010001,EUR,Acme Corp`
+FNB.,10010001,USD,Jane Smith
+FNB.,10010002,USD,Jane Smith
+CSB.,20010001,EUR,Acme Corp`
 		},
 		customers: {
 			filename: 'customers_template.csv',
 			content: `legal_name,customer_type,mobile_phone_number,email,date_of_birth,title,employment_status,highest_education_attained,relationship_status,category,bank_code
-Jane Smith,individual,+1 555 0101,jane@example.com,1985-03-15,Ms,employed,Bachelor,single,,FNB
-John Doe,individual,+1 555 0102,john@example.com,1978-11-22,Mr,employed,Master,married,,FNB
-Acme Corp,corporate,+1 555 0200,info@acme.example.com,,,,,,,CSB`
+Jane Smith,individual,+1 555 0101,jane@example.com,1985-03-15,Ms,employed,Bachelor,single,,FNB.
+John Doe,individual,+1 555 0102,john@example.com,1978-11-22,Mr,employed,Master,married,,FNB.
+Acme Corp,corporate,+1 555 0200,info@acme.example.com,,,,,,,CSB.`
 		},
 		transactions: {
 			filename: 'transactions_template.csv',
 			content: `date,from_account_number,from_bank_code,to_account_number,to_bank_code,amount,currency,description
-2024-06-15,10010001,FNB,10010002,FNB,500.00,USD,Monthly savings transfer
-2024-06-16,10010001,FNB,10010002,FNB,250.00,USD,Expense reimbursement`
+2024-06-15,10010001,FNB.,10010002,FNB.,500.00,USD,Monthly savings transfer
+2024-06-16,10010001,FNB.,10010002,FNB.,250.00,USD,Expense reimbursement`
 		}
 	};
 
 	// Example data — a complete, realistic set you can import right away
 	const exampleData = {
 		banks: `full_name,bank_code
-Greenfield Community Bank,GCB
-Riverside Savings & Loans,RSL`,
+Greenfield Community Bank,GCB.
+Riverside Savings & Loans,RSL.`,
 		accounts: `bank_code,number,currency,legal_name
-GCB,GCB-0001,USD,Maria Garcia
-GCB,GCB-0002,USD,Maria Garcia
-GCB,GCB-0003,USD,James Chen
-GCB,GCB-0004,USD,Sunrise Bakery Ltd
-RSL,RSL-0001,EUR,James Chen
-RSL,RSL-0002,EUR,Sunrise Bakery Ltd`,
+GCB.,GCB-0001,USD,Maria Garcia
+GCB.,GCB-0002,USD,Maria Garcia
+GCB.,GCB-0003,USD,James Chen
+GCB.,GCB-0004,USD,Sunrise Bakery Ltd
+RSL.,RSL-0001,EUR,James Chen
+RSL.,RSL-0002,EUR,Sunrise Bakery Ltd`,
 		customers: `legal_name,customer_type,mobile_phone_number,email,date_of_birth,title,employment_status,highest_education_attained,relationship_status,category,bank_code
-Maria Garcia,individual,+1 555 0101,maria.garcia@example.com,1985-03-15,Ms,employed,Bachelor,married,,GCB
-James Chen,individual,+1 555 0102,james.chen@example.com,1978-11-22,Mr,self-employed,Master,single,,GCB
-Priya Patel,individual,+1 555 0103,priya.patel@example.com,1992-07-08,Dr,employed,Doctorate,married,,GCB
-Sunrise Bakery Ltd,corporate,+1 555 0200,info@sunrisebakery.example.com,,,,,,Food & Beverage,GCB
-James Chen,individual,+44 20 7946 0102,james.chen@example.com,1978-11-22,Mr,self-employed,Master,single,,RSL
-Sunrise Bakery Ltd,corporate,+44 20 7946 0200,info@sunrisebakery.example.com,,,,,,Food & Beverage,RSL`,
+Maria Garcia,individual,+1 555 0101,maria.garcia@example.com,1985-03-15,Ms,employed,Bachelor,married,,GCB.
+James Chen,individual,+1 555 0102,james.chen@example.com,1978-11-22,Mr,self-employed,Master,single,,GCB.
+Priya Patel,individual,+1 555 0103,priya.patel@example.com,1992-07-08,Dr,employed,Doctorate,married,,GCB.
+Sunrise Bakery Ltd,corporate,+1 555 0200,info@sunrisebakery.example.com,,,,,,Food & Beverage,GCB.
+James Chen,individual,+44 20 7946 0102,james.chen@example.com,1978-11-22,Mr,self-employed,Master,single,,RSL.
+Sunrise Bakery Ltd,corporate,+44 20 7946 0200,info@sunrisebakery.example.com,,,,,,Food & Beverage,RSL.`,
 		transactions: `date,from_account_number,from_bank_code,to_account_number,to_bank_code,amount,currency,description
-2024-06-01,GCB-0001,GCB,GCB-0002,GCB,12500.00,USD,June payroll funding
-2024-06-05,GCB-0001,GCB,GCB-0003,GCB,3200.00,USD,Quarterly tax provision
-2024-06-10,GCB-0001,GCB,GCB-0004,GCB,2000.00,USD,Q3 marketing budget
-2024-06-15,GCB-0002,GCB,GCB-0001,GCB,850.00,USD,Payroll correction refund
-2024-06-20,RSL-0001,RSL,RSL-0002,RSL,5000.00,EUR,Investment transfer`
+2024-06-01,GCB-0001,GCB.,GCB-0002,GCB.,12500.00,USD,June payroll funding
+2024-06-05,GCB-0001,GCB.,GCB-0003,GCB.,3200.00,USD,Quarterly tax provision
+2024-06-10,GCB-0001,GCB.,GCB-0004,GCB.,2000.00,USD,Q3 marketing budget
+2024-06-15,GCB-0002,GCB.,GCB-0001,GCB.,850.00,USD,Payroll correction refund
+2024-06-20,RSL-0001,RSL.,RSL-0002,RSL.,5000.00,EUR,Investment transfer`
 	};
 
 	function downloadCsv(filename: string, content: string) {
