@@ -508,7 +508,14 @@
 
 					<!-- Full JSON -->
 					<details class="text-xs">
-						<summary class="cursor-pointer text-surface-400 hover:text-white mb-2">Show full JSON plan</summary>
+						<summary class="cursor-pointer text-surface-400 hover:text-white mb-2 flex items-center gap-2">
+							<span>Show full JSON plan</span>
+							<button
+								type="button"
+								class="ml-2 px-2 py-0.5 text-xs bg-surface-700 hover:bg-surface-600 text-surface-200 rounded"
+								onclick={(e) => { e.preventDefault(); copyToClipboard('fullJson', JSON.stringify(preview, null, 2)); }}
+							>{copiedSection === 'fullJson' ? 'Copied!' : 'Copy'}</button>
+						</summary>
 						<pre class="bg-surface-900 p-3 rounded overflow-auto max-h-96 text-xs">{JSON.stringify(preview, null, 2)}</pre>
 					</details>
 				</div>
